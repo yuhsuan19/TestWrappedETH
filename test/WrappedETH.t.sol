@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract WrappedETHTest is Test {
     
     event Deposit(address from, uint256 amount) ;
+    event Withdraw(address from, uint256 amount);
 
     WrappedETH instance;
     address user1;
@@ -17,18 +18,17 @@ contract WrappedETHTest is Test {
         instance = new WrappedETH();
     }
 
-    function testDeposit() public {   
-        uint256 userBalanceBefore = IERC20(address(instance)).balanceOf(user1);
-        uint256 contractBalanceBefore = address(instance).balance;
-        uint256 depositAmount = 0.5 ether;
-
+    function testDeposit() public {
+        uint256 depositAmount = 0.5 ether;   
         deal(user1, depositAmount);
 
-        vm.startPrank(user1);
-        
-        vm.expectEmit(address(instance));
-        emit Deposit(user1, depositAmount); // test case 3
+        uint256 userBalanceBefore = IERC20(address(instance)).balanceOf(user1);
+        uint256 contractBalanceBefore = address(instance).balance;
 
+        vm.startPrank(user1);
+        // test case 3: deposit 應該要 emit Deposit event
+        vm.expectEmit(address(instance));
+        emit Deposit(user1, depositAmount);
         (bool success, ) = address(instance).call {value: depositAmount}(abi.encodeWithSignature("deposit()"));
         vm.stopPrank();
 
@@ -36,7 +36,43 @@ contract WrappedETHTest is Test {
         uint256 contractBalanceAfter = address(instance).balance;
 
         assert(success);
-        assertEq((userBalanceAfter - userBalanceBefore), depositAmount);  // test case 1
-        assertEq((contractBalanceAfter - contractBalanceBefore), depositAmount); // test case 2
+        // test case 1: deposit 應該將與 msg.value 相等的 ERC20 token mint 給 user
+        assertEq((userBalanceAfter - userBalanceBefore), depositAmount);
+        // test case 2: deposit 應該將 msg.value 的 ether 轉入合約
+        assertEq((contractBalanceAfter - contractBalanceBefore), depositAmount);
+    }
+
+    function testWithdraw() public {
+        uint256 withdrawAmount = 0.5 ether;
+        deal(user1, withdrawAmount);
+        uint256 userBalance = user1.balance;
+
+        // deposit
+        vm.startPrank(user1);
+        (bool depositSuccess, ) = address(instance).call {value: withdrawAmount}(abi.encodeWithSignature("deposit()"));
+        vm.stopPrank();
+        assert(depositSuccess);
+
+        uint256 userWETHBalanceBefore = IERC20(address(instance)).balanceOf(user1);
+        assertEq(userWETHBalanceBefore, withdrawAmount);
+        uint256 totalSupplyBefore = IERC20(address(instance)).totalSupply();
+
+        // withdraw        
+        vm.startPrank(user1);
+        // test case 6: withdraw 應該要 emit Withdraw event
+        vm.expectEmit(address(instance));
+        emit Withdraw(user1, withdrawAmount);
+        (bool withdrawSuccess, ) = address(instance).call(abi.encodeWithSignature("withdraw(uint256)", withdrawAmount)); 
+        vm.stopPrank();
+
+        uint256 userWETHBalanceAfter = IERC20(address(instance)).balanceOf(user1);
+
+        assert(withdrawSuccess);
+        //test case 4: withdraw 應該要 burn 掉與 input parameters 一樣的 erc20 token
+        assertEq(IERC20(address(instance)).totalSupply(), (totalSupplyBefore - withdrawAmount));
+        // test case 5: withdraw 應該將 burn 掉的 erc20 換成 ether 轉給 user
+        assertEq(userWETHBalanceAfter, (userWETHBalanceBefore - withdrawAmount));
+        assertEq(user1.balance, userBalance); 
+
     }
 }

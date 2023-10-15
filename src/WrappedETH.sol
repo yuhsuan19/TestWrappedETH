@@ -5,13 +5,14 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract WrappedETH is ERC20 {
     event Deposit(address from, uint256 amount) ;
+    event Withdraw(address from, uint256 amount);
 
     constructor() ERC20("Wrapped Ether", "WETH") {}
 
     function deposit() public payable {
         require(msg.value > 0, "the value to deposit should not be zero");
-        emit Deposit(msg.sender, msg.value);
         _mint(msg.sender, msg.value);
+        emit Deposit(msg.sender, msg.value);
     }
 
     function withdraw(uint amount) external {
@@ -20,5 +21,6 @@ contract WrappedETH is ERC20 {
 
         payable(msg.sender).transfer(amount);
         _burn(msg.sender, amount);
+        emit Withdraw(msg.sender, amount);
     }
 }
