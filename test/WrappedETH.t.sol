@@ -12,9 +12,11 @@ contract WrappedETHTest is Test {
 
     WrappedETH instance;
     address user1;
+    address user2;
 
     function setUp() public {
         user1 = makeAddr("user1");
+        user2 = makeAddr("user2");
         instance = new WrappedETH();
     }
 
@@ -74,5 +76,31 @@ contract WrappedETHTest is Test {
         assertEq(userWETHBalanceAfter, (userWETHBalanceBefore - withdrawAmount));
         assertEq(user1.balance, userBalance); 
 
+    }
+
+    function testTransfer() public {
+        deal(user1, 1 ether);
+        // deposit
+        vm.startPrank(user1);
+        (bool depositSuccess, ) = address(instance).call {value: 1 ether}(abi.encodeWithSignature("deposit()"));
+        vm.stopPrank();
+        assert(depositSuccess);
+        uint256 user1BalanceBefore = IERC20(address(instance)).balanceOf(user1);
+        assertEq(user1BalanceBefore, 1 ether);
+
+        // transfer
+        uint256 transferAmount = 0.87 ether;
+        uint256 user2BalanceBefore = IERC20(address(instance)).balanceOf(user2);
+        vm.startPrank(user1);
+        (bool transferSuccess, ) = address(instance).call(abi.encodeWithSignature("transfer(address,uint256)", user2, transferAmount));
+        vm.stopPrank();
+
+        uint256 user1BalanceAfter = IERC20(address(instance)).balanceOf(user1);
+        uint256 user2BalanceAfter = IERC20(address(instance)).balanceOf(user2);
+
+        assert(transferSuccess);
+        // test case 7: transfer 應該要將 erc20 token 轉給別人
+        assertEq((user2BalanceAfter - user2BalanceBefore), transferAmount);
+        assertEq((user1BalanceBefore - transferAmount), user1BalanceAfter);
     }
 }
