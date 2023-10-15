@@ -103,4 +103,44 @@ contract WrappedETHTest is Test {
         assertEq((user2BalanceAfter - user2BalanceBefore), transferAmount);
         assertEq((user1BalanceBefore - transferAmount), user1BalanceAfter);
     }
+
+    function testApproveAndTransferFrom() public {
+        deal(user1, 1 ether);
+        // deposit
+        vm.startPrank(user1);
+        (bool depositSuccess, ) = address(instance).call {value: 1 ether}(abi.encodeWithSignature("deposit()"));
+        vm.stopPrank();
+        assert(depositSuccess);
+
+        // approve
+        uint256 approveAmount = 0.5 ether;
+
+        vm.startPrank(user1);
+        (bool approveSuccess, ) = address(instance).call(abi.encodeWithSignature("approve(address,uint256)", user2, approveAmount));
+        vm.stopPrank();
+        assert(approveSuccess);
+        (bool allowanceSuccess, bytes memory allowanceData) = address(instance).call(abi.encodeWithSignature("allowance(address,address)", user1, user2));
+        assert(allowanceSuccess);
+        uint256 allowance = abi.decode(allowanceData, (uint256));
+        // test case 8: approve 應該要給他人 allowance
+        assertEq(allowance, approveAmount);
+        
+        // transferFrom
+        uint256 transferFromAmount = 0.3 ether;
+        uint256 user1BalanceBefore = IERC20(address(instance)).balanceOf(user1);
+        uint256 user2BalanceBefore = IERC20(address(instance)).balanceOf(user2);
+
+        vm.startPrank(user2);
+        (bool transferFromSuccess,) = address(instance).call(abi.encodeWithSignature("transferFrom(address,address,uint256)",user1, user2, transferFromAmount));
+        vm.stopPrank();
+
+        uint256 user1BalanceAfter = IERC20(address(instance)).balanceOf(user1);
+        uint256 user2BalanceAfter = IERC20(address(instance)).balanceOf(user2);
+
+        // test case 9: transferFrom 應該要可以使用他人的 allowance
+        assert(transferFromSuccess);
+        // test case 10: transferFrom 後應該要減除用完的 allowance
+        assertEq((user2BalanceAfter - user2BalanceBefore), transferFromAmount);
+        assertEq((user1BalanceBefore - transferFromAmount), user1BalanceAfter);    
+    }
 }
