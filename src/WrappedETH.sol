@@ -4,10 +4,13 @@ pragma solidity ^0.8.13;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract WrappedETH is ERC20 {
+    event Deposit(address from, uint256 amount) ;
+
     constructor() ERC20("Wrapped Ether", "WETH") {}
 
     function deposit() public payable {
         require(msg.value > 0, "the value to deposit should not be zero");
+        emit Deposit(msg.sender, msg.value);
         _mint(msg.sender, msg.value);
     }
 
@@ -17,9 +20,5 @@ contract WrappedETH is ERC20 {
 
         payable(msg.sender).transfer(amount);
         _burn(msg.sender, amount);
-    }
-
-    receive() external payable {
-        deposit();
     }
 }
